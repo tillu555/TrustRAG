@@ -1,0 +1,10 @@
+{
+  "queries": [
+    {
+      "question": "What is the main research problem addressed by the paper?",
+      "relevant_chunk_ids": [
+        "REPLACE_WITH_REAL_CHUNK_ID"
+      ]
+    }
+  ]
+}

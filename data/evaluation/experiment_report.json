@@ -1,0 +1,14 @@
+{
+  "project": "TrustRAG",
+  "report_type": "Research Evaluation",
+  "generated_at": "2026-11-12T17:15:18.386046+00:00",
+  "retrieval_evaluation": null,
+  "answer_quality_evaluation": null,
+  "limitations": [
+    "Retrieval metrics require manually annotated relevant chunk IDs.",
+    "Citation metrics require manually verified supporting source IDs.",
+    "Claim verification metrics require manually labelled expected outcomes.",
+    "Placeholder benchmark records must not be treated as experimental results.",
+    "Results are not scientifically validated until evaluated on a representative dataset."
+  ]
+}

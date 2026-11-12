@@ -1,0 +1,605 @@
+========== APP.TSX ==========
+import { useEffect, useRef, useState } from "react";
+import {
+  Activity, BookOpen, Bot, CheckCircle2, ChevronRight,
+  FileText, FolderOpen, LayoutDashboard, Loader2,
+  MessageSquare, Plus, Search, Send, ShieldCheck,
+  UploadCloud, X, AlertCircle
+} from "lucide-react";
+import "./App.css";
+
+const API = "http://127.0.0.1:8000";
+
+type DocumentItem = {
+  document_id: string;
+  file_name: string;
+  page_count: number;
+  section_count: number;
+  chunk_count: number;
+};
+
+type Source = {
+  source_id: string;
+  document_name: string;
+  section: string;
+  page_numbers: number[];
+  chunk_id?: string;
+};
+
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+  sources?: Source[];
+};
+
+function App() {
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState("");
+  const [apiOnline, setApiOnline] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const chatEnd = useRef<HTMLDivElement>(null);
+
+  async function loadDocuments() {
+    try {
+      const response = await fetch(`${API}/documents`);
+      if (!response.ok) throw new Error("Could not load library");
+      const data = await response.json();
+      setDocuments(data.documents ?? []);
+      setApiOnline(true);
+      setError("");
+    } catch {
+      setApiOnline(false);
+      setError("Cannot connect to TrustRAG API. Check that FastAPI is running on port 8000.");
+    }
+  }
+
+  useEffect(() => {
+    loadDocuments();
+  }, []);
+
+  useEffect(() => {
+    chatEnd.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, asking]);
+
+  async function uploadPDF(file?: File) {
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please select a PDF file.");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch(`${API}/documents/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "PDF upload failed.");
+      }
+
+      await loadDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  async function askQuestion(event: React.FormEvent) {
+    event.preventDefault();
+    const currentQuestion = question.trim();
+
+    if (!currentQuestion || asking) return;
+
+    if (documents.length === 0) {
+      setError("Upload a research paper before asking a question.");
+      return;
+    }
+
+    setError("");
+    setQuestion("");
+    setMessages((previous) => [
+      ...previous,
+      { role: "user", content: currentQuestion },
+    ]);
+    setAsking(true);
+
+    try {
+      const response = await fetch(`${API}/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: currentQuestion,
+          top_k: 5,
+          candidate_k: 30,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Question request failed.");
+      }
+
+      setMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          content: data.answer,
+          sources: data.sources ?? [],
+        },
+      ]);
+    } catch (err) {
+      setMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          content: err instanceof Error ? err.message : "Something went wrong.",
+        },
+      ]);
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  const totalPages = documents.reduce((sum, doc) => sum + doc.page_count, 0);
+  const totalChunks = documents.reduce((sum, doc) => sum + doc.chunk_count, 0);
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark"><ShieldCheck size={23} /></div>
+          <div>
+            <div className="brand-name">TrustRAG</div>
+            <div className="brand-caption">RESEARCH INTELLIGENCE</div>
+          </div>
+        </div>
+
+        <div className="nav-label">WORKSPACE</div>
+        <nav className="navigation">
+          <button className="nav-item active">
+            <LayoutDashboard size={18} /> Overview
+          </button>
+          <button className="nav-item" onClick={() => fileInput.current?.click()}>
+            <FolderOpen size={18} /> Research library
+          </button>
+          <button className="nav-item" onClick={() => document.getElementById("assistant")?.scrollIntoView({ behavior: "smooth" })}>
+            <MessageSquare size={18} /> AI assistant
+          </button>
+          <button className="nav-item" title="Evaluation dashboard is planned">
+            <Activity size={18} /> Evaluation
+            <span className="nav-soon">SOON</span>
+          </button>
+        </nav>
+
+        <div className="sidebar-bottom">
+          <div className="system-card">
+            <div className="system-heading">
+              <span className={`status-dot ${apiOnline ? "online" : ""}`} />
+              System status
+            </div>
+            <p>{apiOnline ? "API connected" : "API disconnected"}</p>
+            <span className="system-subtitle">Local research environment</span>
+          </div>
+          <div className="sidebar-footer">TrustRAG · Prototype v0.1</div>
+        </div>
+      </aside>
+
+      <main className="main-area">
+        <header className="topbar">
+          <div className="breadcrumb">Workspace <ChevronRight size={14} /> Overview</div>
+          <div className="topbar-right">
+            <span className={`connection ${apiOnline ? "connected" : ""}`}>
+              <span className="status-dot" />
+              {apiOnline ? "Backend connected" : "Backend offline"}
+            </span>
+            <div className="avatar">T</div>
+          </div>
+        </header>
+
+        <div className="content">
+          <section className="welcome-row">
+            <div>
+              <div className="eyebrow">RESEARCH WORKSPACE</div>
+              <h1>Good research starts with <span>trusted evidence.</span></h1>
+              <p>Explore scientific papers, retrieve relevant passages and ask evidence-grounded questions.</p>
+            </div>
+            <button className="primary-button" onClick={() => fileInput.current?.click()} disabled={uploading}>
+              <Plus size={17} /> Add research paper
+            </button>
+          </section>
+
+          {error && (
+            <div className="error-banner">
+              <AlertCircle size={17} />
+              <span>{error}</span>
+              <button onClick={() => setError("")}><X size={16} /></button>
+            </div>
+          )}
+
+          <section className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon purple"><BookOpen size={20} /></div>
+              <div className="stat-label">Research papers</div>
+              <div className="stat-value">{documents.length}</div>
+              <div className="stat-foot">Indexed in your library</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon blue"><FileText size={20} /></div>
+              <div className="stat-label">Total pages</div>
+              <div className="stat-value">{totalPages}</div>
+              <div className="stat-foot">Across indexed papers</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon green"><Search size={20} /></div>
+              <div className="stat-label">Evidence chunks</div>
+              <div className="stat-value">{totalChunks}</div>
+              <div className="stat-foot">Available for retrieval</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon amber"><ShieldCheck size={20} /></div>
+              <div className="stat-label">Verification</div>
+              <div className="stat-value status-text">Not enabled</div>
+              <div className="stat-foot">Claim verification is in development</div>
+            </div>
+          </section>
+
+          <section className="workspace-grid">
+            <div className="panel library-panel" id="library">
+              <div className="panel-header">
+                <div>
+                  <h2>Research library</h2>
+                  <p>Your indexed scientific documents</p>
+                </div>
+                <button className="icon-button" onClick={loadDocuments} title="Refresh library">
+                  <Activity size={17} />
+                </button>
+              </div>
+
+              <div
+                className="upload-zone"
+                onClick={() => fileInput.current?.click()}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  uploadPDF(event.dataTransfer.files[0]);
+                }}
+              >
+                {uploading ? <Loader2 className="spin" size={27} /> : <UploadCloud size={27} />}
+                <strong>{uploading ? "Indexing your paper..." : "Upload a research paper"}</strong>
+                <span>Drag and drop a PDF here, or browse files</span>
+                <small>PDF · Maximum 50 MB</small>
+              </div>
+
+              <div className="document-list">
+                <div className="list-heading">
+                  <span>DOCUMENTS</span>
+                  <span>{documents.length} total</span>
+                </div>
+
+                {documents.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon"><FileText size={24} /></div>
+                    <strong>Your library is empty</strong>
+                    <p>Upload your first scientific paper to start exploring its evidence.</p>
+                  </div>
+                ) : documents.map((doc) => (
+                  <div className="document-row" key={doc.document_id}>
+                    <div className="pdf-icon">PDF</div>
+                    <div className="document-info">
+                      <strong title={doc.file_name}>{doc.file_name}</strong>
+                      <span>{doc.page_count} pages · {doc.section_count} sections · {doc.chunk_count} chunks</span>
+                    </div>
+                    <CheckCircle2 className="indexed-icon" size={18} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel assistant-panel" id="assistant">
+              <div className="panel-header assistant-heading">
+                <div className="assistant-title">
+                  <div className="assistant-icon"><Bot size={20} /></div>
+                  <div>
+                    <h2>Research assistant</h2>
+                    <p>Ask questions across your indexed papers</p>
+                  </div>
+                </div>
+                <span className="model-chip">LOCAL RAG</span>
+              </div>
+
+              <div className="chat-area">
+                {messages.length === 0 ? (
+                  <div className="chat-empty">
+                    <div className="chat-orb"><Bot size={27} /></div>
+                    <h3>What would you like to investigate?</h3>
+                    <p>Ask a question and TrustRAG will retrieve relevant passages from your research library.</p>
+                    <div className="suggested-questions">
+                      {[
+                        "What is the main contribution of these papers?",
+                        "Which methods do the authors use?",
+                        "What limitations do the papers report?",
+                      ].map((item) => (
+                        <button key={item} onClick={() => setQuestion(item)}>
+                          {item}<ChevronRight size={15} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="messages">
+                    {messages.map((message, index) => (
+                      <div className={`message ${message.role}`} key={index}>
+                        <div className="message-avatar">
+                          {message.role === "assistant" ? <Bot size={17} /> : "T"}
+                        </div>
+                        <div className="message-body">
+                          <div className="message-role">{message.role === "assistant" ? "TrustRAG" : "You"}</div>
+                          <p>{message.content}</p>
+                          {message.sources && message.sources.length > 0 && (
+                            <div className="source-list">
+                              <div className="source-heading">RETRIEVED SOURCES</div>
+                              {message.sources.map((source) => (
+                                <div className="source-item" key={source.source_id}>
+                                  <span className="source-id">{source.source_id}</span>
+                                  <div>
+                                    <strong>{source.document_name}</strong>
+                                    <span>{source.section} · Pages {source.page_numbers?.join(", ") || "Not available"}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {asking && (
+                      <div className="thinking"><Loader2 className="spin" size={17} /> Retrieving evidence and generating answer...</div>
+                    )}
+                    <div ref={chatEnd} />
+                  </div>
+                )}
+              </div>
+
+              <form className="chat-composer" onSubmit={askQuestion}>
+                <input
+                  value={question}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  placeholder={documents.length ? "Ask a question about your research..." : "Upload a paper to start asking questions"}
+                  disabled={documents.length === 0 || asking}
+                />
+                <button type="submit" disabled={!question.trim() || asking || documents.length === 0}>
+                  {asking ? <Loader2 className="spin" size={18} /> : <Send size={18} />}
+                </button>
+              </form>
+              <div className="assistant-disclaimer">Answers are generated from retrieved evidence. Independent claim verification is not yet enabled.</div>
+            </div>
+          </section>
+
+          <footer className="page-footer">
+            <span>TrustRAG Research Prototype</span>
+            <span><span className="status-dot online" /> Local-first · Your documents stay on this machine</span>
+          </footer>
+        </div>
+      </main>
+
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".pdf,application/pdf"
+        hidden
+        onChange={(event) => uploadPDF(event.target.files?.[0])}
+      />
+    </div>
+  );
+}
+
+export default App;
+
+========== APP.CSS ==========
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root {
+  font-family: 'DM Sans', sans-serif;
+  color: #202438;
+  background: #f6f7fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+.app-shell { min-height: 100vh; display: flex; }
+.sidebar {
+  width: 245px; flex-shrink: 0; background: #171a2b; color: #fff;
+  padding: 27px 17px; display: flex; flex-direction: column;
+}
+.brand { display: flex; align-items: center; gap: 11px; padding: 0 9px 40px; }
+.brand-mark {
+  width: 40px; height: 40px; border-radius: 12px; display: grid;
+  place-items: center; background: linear-gradient(135deg,#8172f4,#5a53c8);
+}
+.brand-name { font: 800 19px Manrope,sans-serif; letter-spacing: -.7px; }
+.brand-caption { font-size: 8px; letter-spacing: 1.4px; color: #999bb4; margin-top: 3px; }
+.nav-label { color: #777b99; font-size: 10px; letter-spacing: 1.5px; padding: 0 12px 12px; }
+.navigation { display: grid; gap: 6px; }
+.nav-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px;
+  color: #aeb0c5; background: transparent; border: 0; border-radius: 9px;
+  text-align: left; font-size: 13px;
+}
+.nav-item:hover { background: #242840; color: #fff; }
+.nav-item.active { background: #302d50; color: #bcb5ff; }
+.nav-soon { margin-left: auto; font-size: 8px; color: #888ba5; }
+.sidebar-bottom { margin-top: auto; }
+.system-card { background: #22263c; border: 1px solid #30344e; border-radius: 11px; padding: 14px; }
+.system-heading { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.system-card p { margin: 12px 0 3px; font-size: 13px; font-weight: 600; }
+.system-subtitle { color: #8e91a9; font-size: 10px; }
+.sidebar-footer { padding: 22px 4px 0; font-size: 10px; color: #777b96; }
+
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #e6a84d; display: inline-block; }
+.status-dot.online { background: #43c89a; box-shadow: 0 0 8px #43c89a55; }
+
+.main-area { min-width: 0; flex: 1; }
+.topbar {
+  height: 67px; padding: 0 4.2%; background: #fff; border-bottom: 1px solid #e9eaf1;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.breadcrumb { display: flex; align-items: center; gap: 9px; color: #85889b; font-size: 12px; }
+.topbar-right { display: flex; align-items: center; gap: 19px; }
+.connection { display: flex; align-items: center; gap: 8px; color: #a1a3b0; font-size: 11px; }
+.connection.connected { color: #3d9c7c; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: #e9e7ff; color: #6258bd; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+
+.content { max-width: 1500px; padding: 37px 4.2% 25px; margin: auto; }
+.welcome-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 27px; }
+.eyebrow { font-size: 10px; letter-spacing: 1.7px; color: #8176d7; font-weight: 700; }
+h1 { font: 800 clamp(22px,2.2vw,30px) Manrope,sans-serif; letter-spacing: -1.2px; margin: 9px 0 7px; }
+h1 span { color: #7569d5; }
+.welcome-row p { color: #85889a; font-size: 12px; margin: 0; }
+.primary-button {
+  display: flex; align-items: center; gap: 8px; padding: 11px 16px;
+  border: 0; border-radius: 8px; background: #6e63d1; color: white;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.primary-button:hover { background: #5c52bb; }
+.primary-button:disabled { opacity: .6; cursor: wait; }
+
+.error-banner { display: flex; gap: 10px; align-items: center; background: #fff0ef; color: #bd514c; padding: 12px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 18px; }
+.error-banner button { margin-left: auto; border: 0; background: none; color: inherit; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 15px; margin-bottom: 20px; }
+.stat-card { background: #fff; border: 1px solid #eaebf2; border-radius: 11px; padding: 17px; min-width: 0; }
+.stat-icon { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; margin-bottom: 13px; }
+.purple { background: #f0edff; color: #7669d5; }
+.blue { background: #eaf3ff; color: #548ed2; }
+.green { background: #e9f8f1; color: #3aa67c; }
+.amber { background: #fff4e5; color: #d89b40; }
+.stat-label { font-size: 11px; color: #888b9c; }
+.stat-value { font: 800 25px Manrope,sans-serif; margin-top: 5px; }
+.stat-foot { font-size: 10px; color: #a1a3b1; margin-top: 5px; }
+.status-text { font-size: 16px; color: #c18d43; margin-top: 10px; }
+
+.workspace-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 18px; align-items: stretch; }
+.panel { background: white; border: 1px solid #e9eaf1; border-radius: 12px; min-width: 0; overflow: hidden; }
+.panel-header { padding: 19px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f0f0f5; }
+.panel-header h2 { font: 700 14px Manrope,sans-serif; margin: 0; }
+.panel-header p { font-size: 10px; color: #999baa; margin: 5px 0 0; }
+.icon-button { background: #f6f6fa; border: 0; color: #777b91; border-radius: 7px; padding: 8px; display: grid; place-items: center; }
+
+.upload-zone {
+  margin: 17px 18px; min-height: 145px; border: 1px dashed #c9c5eb;
+  border-radius: 10px; background: #faf9ff; color: #8175d4;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 7px; cursor: pointer; transition: .2s;
+}
+.upload-zone:hover { background: #f4f2ff; border-color: #887ce0; }
+.upload-zone strong { color: #46435f; font-size: 12px; }
+.upload-zone span { color: #9999ab; font-size: 10px; }
+.upload-zone small { color: #b0afbd; font-size: 9px; }
+.document-list { padding: 0 18px 15px; }
+.list-heading { display: flex; justify-content: space-between; color: #999baa; font-size: 9px; letter-spacing: 1px; padding: 5px 0 10px; }
+.list-heading span:last-child { letter-spacing: 0; }
+.document-row { display: flex; align-items: center; gap: 11px; padding: 12px 2px; border-top: 1px solid #f0f0f4; }
+.pdf-icon { width: 34px; height: 38px; display: grid; place-items: center; border-radius: 6px; background: #fff0ef; color: #d76d68; font-size: 9px; font-weight: 800; }
+.document-info { min-width: 0; display: grid; gap: 5px; flex: 1; }
+.document-info strong { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-info span { font-size: 9px; color: #9b9dac; }
+.indexed-icon { color: #40b18b; flex-shrink: 0; }
+.empty-state { text-align: center; padding: 24px 12px; }
+.empty-icon { color: #aaa3dd; background: #f4f2ff; width: 43px; height: 43px; border-radius: 12px; display: grid; place-items: center; margin: 0 auto 10px; }
+.empty-state strong { font-size: 11px; }
+.empty-state p { max-width: 240px; margin: 6px auto; color: #a1a3b1; font-size: 10px; line-height: 1.6; }
+
+.assistant-panel { display: flex; flex-direction: column; min-height: 540px; }
+.assistant-title { display: flex; align-items: center; gap: 10px; }
+.assistant-icon { width: 36px; height: 36px; border-radius: 10px; background: #efedff; color: #7468d1; display: grid; place-items: center; }
+.model-chip { background: #f1efff; color: #776cd0; font-size: 8px; font-weight: 700; letter-spacing: .8px; border-radius: 5px; padding: 6px 8px; }
+.chat-area { flex: 1; min-height: 340px; max-height: 480px; overflow-y: auto; }
+.chat-empty { text-align: center; padding: 32px 20px 20px; }
+.chat-orb { margin: auto; width: 53px; height: 53px; display: grid; place-items: center; border-radius: 17px; color: #7569d5; background: #f0edff; }
+.chat-empty h3 { font: 700 14px Manrope,sans-serif; margin: 14px 0 7px; }
+.chat-empty > p { max-width: 285px; margin: auto; color: #9a9cac; font-size: 10px; line-height: 1.7; }
+.suggested-questions { display: grid; gap: 7px; margin: 20px auto 0; max-width: 340px; }
+.suggested-questions button { display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 10px 11px; background: #fafaff; border: 1px solid #ecebf5; border-radius: 7px; color: #77758f; font-size: 10px; }
+.suggested-questions button:hover { border-color: #bcb5ef; color: #6459c1; }
+.chat-composer { margin: 0 16px; display: flex; gap: 8px; padding: 8px; border: 1px solid #e9e8f0; border-radius: 9px; }
+.chat-composer input { flex: 1; min-width: 0; border: 0; outline: 0; font-size: 11px; padding: 4px; color: #34364a; }
+.chat-composer input::placeholder { color: #b0b1bd; }
+.chat-composer button { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 7px; background: #7065d2; color: white; }
+.chat-composer button:disabled { opacity: .4; cursor: not-allowed; }
+.assistant-disclaimer { text-align: center; color: #aaaab6; font-size: 8px; padding: 10px 8px 13px; }
+.messages { padding: 18px; display: grid; gap: 20px; }
+.message { display: flex; gap: 10px; align-items: flex-start; }
+.message-avatar { flex-shrink: 0; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: #efedff; color: #7166cf; font-size: 10px; font-weight: 700; }
+.message.user .message-avatar { background: #eaf3ff; color: #548ed2; }
+.message-body { min-width: 0; flex: 1; }
+.message-role { font-size: 10px; font-weight: 700; margin-bottom: 6px; }
+.message-body > p { margin: 0; font-size: 11px; color: #55586c; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.source-list { margin-top: 12px; background: #fafaff; border: 1px solid #eeedf6; border-radius: 8px; padding: 10px; }
+.source-heading { font-size: 8px; letter-spacing: 1px; color: #9996b2; margin-bottom: 7px; }
+.source-item { display: flex; gap: 9px; align-items: flex-start; padding: 7px 0; border-top: 1px solid #efedf5; }
+.source-id { background: #eae7ff; color: #665bc1; padding: 4px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; }
+.source-item div { display: grid; gap: 4px; min-width: 0; }
+.source-item strong { font-size: 9px; overflow-wrap: anywhere; }
+.source-item span { color: #999baa; font-size: 9px; }
+.thinking { display: flex; align-items: center; gap: 8px; color: #8a84c6; font-size: 10px; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.page-footer { display: flex; justify-content: space-between; gap: 12px; padding: 21px 2px 0; color: #a4a5b2; font-size: 9px; }
+.page-footer span:last-child { display: flex; align-items: center; gap: 7px; }
+
+@media (max-width: 1050px) {
+  .sidebar { width: 205px; }
+  .workspace-grid { grid-template-columns: 1fr; }
+  .assistant-panel { min-height: 500px; }
+}
+@media (max-width: 700px) {
+  .sidebar { width: 62px; padding: 20px 9px; }
+  .brand { padding: 0 2px 35px; }
+  .brand > div:last-child, .nav-label, .nav-item:not(.active), .nav-item.active { font-size: 0; }
+  .nav-item { justify-content: center; padding: 12px 0; }
+  .nav-item svg { flex-shrink: 0; }
+  .sidebar-bottom { display: none; }
+  .stats-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .content { padding: 25px 15px; }
+  .welcome-row { align-items: flex-start; flex-direction: column; }
+  .topbar { padding: 0 15px; }
+  .connection { font-size: 0; }
+  .page-footer { flex-direction: column; }
+}
+
+========== INDEX.CSS ==========
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}

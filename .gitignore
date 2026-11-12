@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Generated data and model files
+data/processed/
+data/external/
+models/
+logs/
+*.faiss
+*.pkl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Model and ML caches
+.cache/
+.cache_huggingface/
+models/
+*.safetensors
+*.onnx
+
+# Local data and private research PDFs
+data/raw/uploads/
+data/processed/
+data/indexes/
+data/vector_store/
+
+# Generated evaluation reports
+data/evaluation/retrieval_report.json
+data/evaluation/ablation_comparison.csv
+data/evaluation/answer_quality_results.json
+data/evaluation/answer_quality_results.csv
+data/evaluation/answer_review_template.json
+data/evaluation/experiment_metadata.json
+
+# Logs and temporary files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

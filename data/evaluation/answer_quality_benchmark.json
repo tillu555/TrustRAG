@@ -1,0 +1,16 @@
+{
+  "description": "Manually annotated answer and claim verification benchmark",
+  "answers": [
+    {
+      "question": "REPLACE_WITH_RESEARCH_QUESTION",
+      "expected_supporting_source_ids": ["S1"],
+      "claims": [
+        {
+          "claim": "REPLACE_WITH_VERIFIABLE_CLAIM",
+          "expected": "SUPPORTED",
+          "predicted": "SUPPORTED"
+        }
+      ]
+    }
+  ]
+}

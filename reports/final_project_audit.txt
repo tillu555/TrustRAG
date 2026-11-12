@@ -1,0 +1,74 @@
+======================================
+       TRUSTRAG FINAL PROJECT AUDIT
+======================================
+Thu, Nov 12, 2026 10:47:27 PM
+
+1. PYTHON COMPILATION
+Python compilation completed.
+
+2. BACKEND TESTS
+........................................................................ [ 75%]
+........................                                                 [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fitz\__init__.py:17
+  C:\Users\tillu\TrustRAG\.venv\Lib\site-packages\fitz\__init__.py:17: FutureWarning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+96 passed, 1 warning in 23.58s
+
+3. FRONTEND PRODUCTION BUILD
+
+> frontend@0.0.0 build
+> tsc -b && vite build
+
+[36mvite v8.3.8 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 2085 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.45 kB │ gzip:  0.29 kB
+dist/assets/index-1B-AOr49.css   23.23 kB │ gzip:  5.80 kB
+dist/assets/index-Dar81PHB.js   249.21 kB │ gzip: 77.23 kB
+
+[32m✓ built in 478ms[39m
+
+4. REQUIRED PROJECT FILES
+PASS: README.md
+PASS: requirements.txt
+PASS: src/api/app.py
+PASS: src/pipeline.py
+PASS: src/evaluation/metrics.py
+PASS: src/evaluation/runner.py
+PASS: frontend/package.json
+
+5. RESEARCH DATA READINESS
+FOUND: annotation_candidates.json
+FOUND: benchmark.json
+PENDING: retrieval_report.json
+PENDING: answer_review_template.json
+PENDING: answer_quality_results.json
+PENDING: experiment_metadata.json
+Benchmark questions: 0
+
+6. GIT STATUS
+?? .env.example
+?? .gitignore
+?? README.md
+?? configs/
+?? data/
+?? frontend/
+?? frontend_code.txt
+?? pyproject.toml
+?? reports/
+?? requirements.txt
+?? scripts/
+?? src/
+?? tests/
+
+======================================
+AUDIT SUMMARY
+Backend tests exit code: 0
+Frontend build exit code: 0
+Full report: reports/final_project_audit.txt
+======================================
